@@ -1,0 +1,346 @@
+openapi: 3.0.3
+info:
+  title: Cravings Compass API
+  version: 1.0.0
+  description: >
+    Backend API for Cravings Compass. Handles users, restaurants, deals,
+    saved deals, favorites, notifications, and reward tracking.
+    Clients must NEVER access the database directly.
+
+servers:
+  - url: https://api.cravingscompass.com/v1
+
+tags:
+  - name: Users
+  - name: Restaurants
+  - name: Deals
+  - name: SavedDeals
+  - name: Favorites
+  - name: Notifications
+  - name: Rewards
+
+# =========================
+# USERS
+# =========================
+paths:
+
+  /users:
+    post:
+      tags: [Users]
+      summary: Create user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email: { type: string }
+                display_name: { type: string }
+                budget_preference: { type: number }
+                home_location: { type: string }
+                work_or_school_location: { type: string }
+      responses:
+        "201":
+          description: User created
+
+    get:
+      tags: [Users]
+      summary: Get all users
+      responses:
+        "200":
+          description: List of users
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      parameters:
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: User profile
+
+    put:
+      tags: [Users]
+      summary: Update user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: Updated
+
+    delete:
+      tags: [Users]
+      summary: Delete user
+      responses:
+        "200":
+          description: Deleted
+
+# =========================
+# RESTAURANTS
+# =========================
+  /restaurants:
+    post:
+      tags: [Restaurants]
+      summary: Create restaurant
+      responses:
+        "201":
+          description: Created
+
+    get:
+      tags: [Restaurants]
+      summary: List restaurants
+      responses:
+        "200":
+          description: List
+
+  /restaurants/{restaurantId}:
+    get:
+      tags: [Restaurants]
+      summary: Get restaurant
+      responses:
+        "200":
+          description: Restaurant
+
+    put:
+      tags: [Restaurants]
+      summary: Update restaurant
+      responses:
+        "200":
+          description: Updated
+
+    delete:
+      tags: [Restaurants]
+      summary: Delete restaurant
+      responses:
+        "200":
+          description: Deleted
+
+# =========================
+# DEALS
+# =========================
+  /deals:
+    post:
+      tags: [Deals]
+      summary: Create deal
+      responses:
+        "201":
+          description: Created
+
+    get:
+      tags: [Deals]
+      summary: Get active deals (ranked)
+      description: Returns non-expired deals sorted by value_score and price
+      responses:
+        "200":
+          description: List of deals
+
+  /deals/{dealId}:
+    get:
+      tags: [Deals]
+      summary: Get deal
+      responses:
+        "200":
+          description: Deal
+
+    put:
+      tags: [Deals]
+      summary: Update deal (e.g., expire it)
+      responses:
+        "200":
+          description: Updated
+
+    delete:
+      tags: [Deals]
+      summary: Delete deal
+      responses:
+        "200":
+          description: Deleted
+
+# =========================
+# SAVED DEALS
+# =========================
+  /users/{userId}/saved-deals:
+    post:
+      tags: [SavedDeals]
+      summary: Save a deal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                deal_id: { type: string }
+      responses:
+        "201":
+          description: Saved
+
+    get:
+      tags: [SavedDeals]
+      summary: Get saved deals for user
+      responses:
+        "200":
+          description: List
+
+    delete:
+      tags: [SavedDeals]
+      summary: Remove all saved deals for user
+      responses:
+        "200":
+          description: Deleted
+
+  /users/{userId}/saved-deals/{dealId}:
+    delete:
+      tags: [SavedDeals]
+      summary: Remove specific saved deal
+      responses:
+        "200":
+          description: Deleted
+
+# =========================
+# FAVORITES
+# =========================
+  /users/{userId}/favorites:
+    post:
+      tags: [Favorites]
+      summary: Favorite restaurant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                restaurant_id: { type: string }
+      responses:
+        "201":
+          description: Favorited
+
+    get:
+      tags: [Favorites]
+      summary: Get favorite restaurants
+      responses:
+        "200":
+          description: List
+
+    delete:
+      tags: [Favorites]
+      summary: Remove all favorites
+      responses:
+        "200":
+          description: Deleted
+
+# =========================
+# NOTIFICATIONS
+# =========================
+  /users/{userId}/notifications:
+    post:
+      tags: [Notifications]
+      summary: Set notification preference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notification_type: { type: string }
+                is_enabled: { type: boolean }
+      responses:
+        "201":
+          description: Created/Updated
+
+    get:
+      tags: [Notifications]
+      summary: Get notification settings
+      responses:
+        "200":
+          description: List
+
+    put:
+      tags: [Notifications]
+      summary: Update notification setting
+      responses:
+        "200":
+          description: Updated
+
+    delete:
+      tags: [Notifications]
+      summary: Delete notification setting
+      responses:
+        "200":
+          description: Deleted
+
+# =========================
+# REWARDS
+# =========================
+  /users/{userId}/rewards:
+    post:
+      tags: [Rewards]
+      summary: Create reward account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                restaurant_id: { type: string }
+                points_balance: { type: integer }
+      responses:
+        "201":
+          description: Created
+
+    get:
+      tags: [Rewards]
+      summary: Get reward accounts
+      responses:
+        "200":
+          description: List
+
+  /users/{userId}/rewards/{restaurantId}:
+    put:
+      tags: [Rewards]
+      summary: Add or subtract points
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                points_change: { type: integer }
+      responses:
+        "200":
+          description: Updated
+
+    delete:
+      tags: [Rewards]
+      summary: Delete reward account
+      responses:
+        "200":
+          description: Deleted
+
+  /rewards/transactions:
+    get:
+      tags: [Rewards]
+      summary: Get reward transaction history
+      responses:
+        "200":
+          description: List of transactions
+
+    post:
+      tags: [Rewards]
+      summary: Create reward transaction
+      responses:
+        "201":
+          description: Created
