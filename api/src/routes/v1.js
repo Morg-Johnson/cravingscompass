@@ -402,9 +402,25 @@ router.get('/users/:userId/saved-deals', async (req, res, next) => {
   try {
     const { userId } = req.params;
     const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase.from(TABLES.savedDeals).select('*').eq('user_id', userId);
-    if (error) throw mapSupabaseError(error);
-    res.json(data);
+
+    // Prefer enriched response using foreign table relationships (saved_deals -> deals -> restaurants)
+    // so the client can display human-readable deal/restaurant names.
+    const enriched = await supabase
+      .from(TABLES.savedDeals)
+      .select(
+        'saved_deal_id,user_id,deal_id,saved_at,deal:deals(deal_id,title,price,value_score,expiration_time,restaurant_id,restaurant:restaurants(restaurant_id,name))'
+      )
+      .eq('user_id', userId);
+
+    if (!enriched.error) {
+      res.json(enriched.data);
+      return;
+    }
+
+    // Fallback if relationships aren't configured in PostgREST schema cache.
+    const basic = await supabase.from(TABLES.savedDeals).select('*').eq('user_id', userId);
+    if (basic.error) throw mapSupabaseError(basic.error);
+    res.json(basic.data);
   } catch (e) {
     next(e);
   }

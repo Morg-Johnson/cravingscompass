@@ -1,0 +1,111 @@
+:root {
+  --text: #6b7280;
+  --text-h: #0b1220;
+  --bg: #0b1220;
+  --surface: rgba(255, 255, 255, 0.86);
+  --surface-2: rgba(255, 255, 255, 0.72);
+  --border: rgba(15, 23, 42, 0.12);
+  --code-bg: rgba(15, 23, 42, 0.06);
+  --accent: #7c3aed;
+  --accent-bg: rgba(124, 58, 237, 0.1);
+  --accent-border: rgba(124, 58, 237, 0.35);
+  --social-bg: rgba(15, 23, 42, 0.06);
+  --focus: rgba(124, 58, 237, 0.35);
+  --ring: rgba(2, 6, 23, 0.08);
+  --shadow:
+    rgba(2, 6, 23, 0.08) 0 10px 30px -12px,
+    rgba(2, 6, 23, 0.04) 0 8px 16px -8px;
+
+  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font: 16px/155% var(--sans);
+  letter-spacing: 0.18px;
+  color-scheme: light;
+  color: var(--text);
+  background: radial-gradient(900px 600px at 20% 10%, rgba(124, 58, 237, 0.18), rgba(124, 58, 237, 0) 60%),
+    radial-gradient(900px 600px at 90% 0%, rgba(56, 189, 248, 0.12), rgba(56, 189, 248, 0) 55%),
+    linear-gradient(180deg, #0b1220, #0b1220);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 16px;
+  }
+}
+
+body {
+  margin: 0;
+  padding: 24px 14px;
+}
+
+#root {
+  width: min(1126px, 100%);
+  margin: 0 auto;
+  text-align: center;
+  min-height: calc(100svh - 48px);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  font-weight: 650;
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: 48px;
+  letter-spacing: -1.2px;
+  margin: 24px 0 12px;
+  @media (max-width: 1024px) {
+    font-size: 36px;
+    margin: 20px 0;
+  }
+}
+h2 {
+  font-size: 24px;
+  line-height: 118%;
+  letter-spacing: -0.24px;
+  margin: 0 0 8px;
+  @media (max-width: 1024px) {
+    font-size: 20px;
+  }
+}
+p {
+  margin: 0;
+}
+
+code,
+.counter {
+  font-family: var(--mono);
+  display: inline-flex;
+  border-radius: 4px;
+  color: var(--text-h);
+}
+
+code {
+  font-size: 15px;
+  line-height: 135%;
+  padding: 4px 8px;
+  background: var(--code-bg);
+}
+
+a {
+  color: var(--text-h);
+}
+
+*:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
