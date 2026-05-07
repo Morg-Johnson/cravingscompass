@@ -98,6 +98,13 @@ export async function addFavorite(userId, restaurantId) {
   })
 }
 
+export async function removeFavorite(userId, restaurantId) {
+  return request(
+    `/users/${encodeURIComponent(userId)}/favorites/${encodeURIComponent(restaurantId)}`,
+    { method: 'DELETE' }
+  )
+}
+
 export async function clearFavorites(userId) {
   return request(`/users/${encodeURIComponent(userId)}/favorites`, { method: 'DELETE' })
 }
@@ -135,11 +142,22 @@ export async function createRewardAccount(userId, restaurantId, points_balance) 
   })
 }
 
-export async function changeRewardPoints(userId, restaurantId, points_change) {
+export async function createRewardAccountWithExpiration(userId, restaurantId, points_balance, points_expiration_date) {
+  return request(`/users/${encodeURIComponent(userId)}/rewards`, {
+    method: 'POST',
+    body: JSON.stringify({ restaurant_id: restaurantId, points_balance, points_expiration_date }),
+  })
+}
+
+export async function updateRewardAccount(userId, restaurantId, patch) {
   return request(`/users/${encodeURIComponent(userId)}/rewards/${encodeURIComponent(restaurantId)}`, {
     method: 'PUT',
-    body: JSON.stringify({ points_change }),
+    body: JSON.stringify(patch || {}),
   })
+}
+
+export async function changeRewardPoints(userId, restaurantId, points_change) {
+  return updateRewardAccount(userId, restaurantId, { points_change })
 }
 
 export async function deleteRewardAccount(userId, restaurantId) {

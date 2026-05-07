@@ -296,6 +296,7 @@ paths:
               properties:
                 restaurant_id: { type: string }
                 points_balance: { type: integer }
+                points_expiration_date: { type: string, format: date-time }
       responses:
         "201":
           description: Created
@@ -319,6 +320,7 @@ paths:
               type: object
               properties:
                 points_change: { type: integer }
+                points_expiration_date: { type: string, format: date-time }
       responses:
         "200":
           description: Updated

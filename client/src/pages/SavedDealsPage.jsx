@@ -14,6 +14,7 @@ function SavedDealsPage() {
   const [restaurantById, setRestaurantById] = useState({})
   const [busyId, setBusyId] = useState(null)
   const [clearing, setClearing] = useState(false)
+  const [expirationFilter, setExpirationFilter] = useState('all')
 
   async function load() {
     if (!userId) return
@@ -28,6 +29,40 @@ function SavedDealsPage() {
       setStatus('error')
     }
   }
+
+  const filteredItems = useMemo(() => {
+    if (expirationFilter === 'all') return items
+
+    const now = Date.now()
+    const dayMs = 24 * 60 * 60 * 1000
+    const withinMs = expirationFilter === '7d' ? 7 * dayMs : expirationFilter === '30d' ? 30 * dayMs : null
+
+    return items.filter((row) => {
+      const dealId = row?.deal_id
+      const embeddedDeal = row?.deal || null
+      const deal = embeddedDeal || (dealId ? dealById[dealId] : null)
+      const expRaw = deal?.expiration_time || deal?.expires_at
+
+      if (!expRaw) {
+        return expirationFilter === 'no_exp'
+      }
+
+      const expTime = new Date(expRaw).getTime()
+      if (!Number.isFinite(expTime)) {
+        return expirationFilter === 'no_exp'
+      }
+
+      if (expirationFilter === 'expired') {
+        return expTime < now
+      }
+
+      if (withinMs != null) {
+        return expTime >= now && expTime <= now + withinMs
+      }
+
+      return true
+    })
+  }, [dealById, expirationFilter, items])
 
   const dealIds = useMemo(() => {
     const ids = new Set()
@@ -160,6 +195,19 @@ function SavedDealsPage() {
         <h2>Your saved list</h2>
         <div className="card">
           <div className="actions" style={{ marginBottom: 12 }}>
+            <label className="label" style={{ minWidth: 220 }}>
+              Expiration
+              <select
+                className="input"
+                value={expirationFilter}
+                onChange={(e) => setExpirationFilter(e.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="7d">Expiring in 7 days</option>
+                <option value="30d">Expiring in 30 days</option>
+                <option value="expired">Expired</option>
+              </select>
+            </label>
             <button type="button" className="btn" onClick={load} disabled={status === 'loading'}>
               Refresh
             </button>
@@ -172,10 +220,13 @@ function SavedDealsPage() {
           {status === 'loading' ? <p className="muted">Loading…</p> : null}
           {status === 'error' ? <p className="muted">{error?.message || 'Failed to load saved deals'}</p> : null}
           {status === 'success' && items.length === 0 ? <p className="muted">No saved deals yet.</p> : null}
+          {status === 'success' && items.length > 0 && filteredItems.length === 0 ? (
+            <p className="muted">No saved deals match that filter.</p>
+          ) : null}
 
-          {items.length > 0 ? (
+          {filteredItems.length > 0 ? (
             <div className="list">
-              {items.map((row) => {
+              {filteredItems.map((row) => {
                 const dealId = row?.deal_id
                 const embeddedDeal = row?.deal || null
                 const deal = embeddedDeal || (dealId ? dealById[dealId] : null)
@@ -186,6 +237,8 @@ function SavedDealsPage() {
                 const title = deal?.title || 'Deal'
                 const restaurantName = restaurant?.name || (rid ? `Restaurant ${rid.slice(0, 8)}…` : null)
                 const price = deal?.price != null ? `$${Number(deal.price).toFixed(2)}` : null
+                const exp = deal?.expiration_time || deal?.expires_at
+                const expiration = exp ? `Expires ${String(exp).slice(0, 10)}` : null
                 return (
                   <div key={row?.saved_deal_id || dealId} className="list-row">
                     <div>
@@ -193,6 +246,7 @@ function SavedDealsPage() {
                       <div className="row-meta">
                         {restaurantName ? `${restaurantName} · ` : ''}
                         {price ? `${price} · ` : ''}
+                        {expiration ? `${expiration} · ` : ''}
                       </div>
                     </div>
                     <div className="actions">

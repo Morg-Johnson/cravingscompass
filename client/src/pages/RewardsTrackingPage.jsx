@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import {
   changeRewardPoints,
-  createRewardAccount,
+  createRewardAccountWithExpiration,
   createRewardTransaction,
   deleteRewardAccount,
   getRewardTransactions,
   getRewards,
   getRestaurantById,
   getRestaurants,
+  updateRewardAccount,
 } from '../lib/api'
 
 function RewardsTrackingPage() {
@@ -29,7 +30,10 @@ function RewardsTrackingPage() {
 
   const [restaurantId, setRestaurantId] = useState('')
   const [startingPoints, setStartingPoints] = useState('100')
+  const [pointsExpirationDate, setPointsExpirationDate] = useState('')
   const [busyRestaurantId, setBusyRestaurantId] = useState(null)
+  const [pointsDeltaByRestaurantId, setPointsDeltaByRestaurantId] = useState({})
+  const [expirationByRestaurantId, setExpirationByRestaurantId] = useState({})
 
   const [rewardAccountId, setRewardAccountId] = useState('')
   const [pointsChange, setPointsChange] = useState('10')
@@ -143,8 +147,10 @@ function RewardsTrackingPage() {
     setError(null)
     try {
       const points = Number(startingPoints)
-      await createRewardAccount(userId, rid, Number.isFinite(points) ? points : 0)
+      const exp = pointsExpirationDate ? `${pointsExpirationDate}T00:00:00Z` : null
+      await createRewardAccountWithExpiration(userId, rid, Number.isFinite(points) ? points : 0, exp)
       setRestaurantId('')
+      setPointsExpirationDate('')
       await loadAccounts()
     } catch (e) {
       setError(e)
@@ -159,6 +165,36 @@ function RewardsTrackingPage() {
     setError(null)
     try {
       await changeRewardPoints(userId, rid, delta)
+      setPointsDeltaByRestaurantId((prev) => {
+        const next = { ...prev }
+        delete next[rid]
+        return next
+      })
+      await loadAccounts()
+    } catch (e) {
+      setError(e)
+    } finally {
+      setBusyRestaurantId(null)
+    }
+  }
+
+  async function handleApplyDelta(rid) {
+    if (!rid) return
+    const raw = pointsDeltaByRestaurantId[rid]
+    const delta = Number(raw)
+    if (!Number.isFinite(delta) || delta === 0) return
+    await handleChangePoints(rid, delta)
+  }
+
+  async function handleSaveExpiration(rid) {
+    if (!userId) return
+    if (!rid) return
+    setBusyRestaurantId(rid)
+    setError(null)
+    try {
+      const raw = expirationByRestaurantId[rid]
+      const exp = raw ? `${raw}T00:00:00Z` : null
+      await updateRewardAccount(userId, rid, { points_expiration_date: exp })
       await loadAccounts()
     } catch (e) {
       setError(e)
@@ -232,6 +268,16 @@ function RewardsTrackingPage() {
                 disabled={status === 'loading'}
               />
             </label>
+            <label className="label">
+              Points expiration
+              <input
+                className="input"
+                type="date"
+                value={pointsExpirationDate}
+                onChange={(e) => setPointsExpirationDate(e.target.value)}
+                disabled={status === 'loading'}
+              />
+            </label>
           </div>
 
           <div className="actions" style={{ marginBottom: 12 }}>
@@ -259,6 +305,8 @@ function RewardsTrackingPage() {
                 const rid = row?.restaurant_id
                 const r = rid ? restaurantById[rid] : null
                 const name = r?.name || 'Restaurant'
+                const expRaw = row?.points_expiration_date
+                const expDefault = expRaw ? String(expRaw).slice(0, 10) : ''
                 return (
                   <div key={row?.reward_account_id || rid} className="list-row">
                     <div>
@@ -268,21 +316,52 @@ function RewardsTrackingPage() {
                       </div>
                     </div>
                     <div className="actions">
+                      <input
+                        className="input"
+                        type="date"
+                        value={expirationByRestaurantId[rid] ?? expDefault}
+                        onChange={(e) =>
+                          setExpirationByRestaurantId((prev) => ({
+                            ...prev,
+                            [rid]: e.target.value,
+                          }))
+                        }
+                        disabled={!rid || busyRestaurantId === rid}
+                      />
                       <button
                         type="button"
                         className="btn"
-                        onClick={() => handleChangePoints(rid, 25)}
+                        onClick={() => handleSaveExpiration(rid)}
                         disabled={!rid || busyRestaurantId === rid}
                       >
-                        +25
+                        Save
                       </button>
+                      <input
+                        className="input"
+                        inputMode="numeric"
+                        placeholder="Add Points"
+                        value={pointsDeltaByRestaurantId[rid] ?? ''}
+                        onChange={(e) =>
+                          setPointsDeltaByRestaurantId((prev) => ({
+                            ...prev,
+                            [rid]: e.target.value,
+                          }))
+                        }
+                        disabled={!rid || busyRestaurantId === rid}
+                        style={{ maxWidth: 140 }}
+                      />
                       <button
                         type="button"
                         className="btn"
-                        onClick={() => handleChangePoints(rid, -25)}
-                        disabled={!rid || busyRestaurantId === rid}
+                        onClick={() => handleApplyDelta(rid)}
+                        disabled={
+                          !rid ||
+                          busyRestaurantId === rid ||
+                          !Number.isFinite(Number(pointsDeltaByRestaurantId[rid])) ||
+                          Number(pointsDeltaByRestaurantId[rid]) === 0
+                        }
                       >
-                        -25
+                        Apply
                       </button>
                       <button
                         type="button"

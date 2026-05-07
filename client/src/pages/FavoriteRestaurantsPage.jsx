@@ -6,6 +6,7 @@ import {
   getFavorites,
   getRestaurantById,
   getRestaurants,
+  removeFavorite,
 } from '../lib/api'
 
 function FavoriteRestaurantsPage() {
@@ -21,6 +22,7 @@ function FavoriteRestaurantsPage() {
   const [restaurantId, setRestaurantId] = useState('')
   const [adding, setAdding] = useState(false)
   const [clearing, setClearing] = useState(false)
+  const [removingId, setRemovingId] = useState(null)
 
   async function load() {
     if (!userId) return
@@ -33,6 +35,21 @@ function FavoriteRestaurantsPage() {
     } catch (e) {
       setError(e)
       setStatus('error')
+    }
+  }
+
+  async function handleRemove(restaurantIdToRemove) {
+    if (!userId) return
+    if (!restaurantIdToRemove) return
+    setRemovingId(restaurantIdToRemove)
+    setError(null)
+    try {
+      await removeFavorite(userId, restaurantIdToRemove)
+      await load()
+    } catch (e) {
+      setError(e)
+    } finally {
+      setRemovingId(null)
     }
   }
 
@@ -181,16 +198,26 @@ function FavoriteRestaurantsPage() {
 
           {items.length > 0 ? (
             <div className="list">
-              {items.map((row) => (
-                <div key={row?.favorite_id || row?.restaurant_id} className="list-row">
-                  <div>
-                    <div className="row-title">{restaurantById[row?.restaurant_id]?.name || 'Restaurant'}</div>
-                    {restaurantById[row?.restaurant_id]?.location_address ? (
-                      <div className="row-meta">{restaurantById[row?.restaurant_id]?.location_address}</div>
-                    ) : null}
+              {items.map((row) => {
+                const rid = row?.restaurant_id
+                const r = rid ? restaurantById[rid] : null
+                return (
+                  <div key={row?.favorite_id || rid} className="list-row">
+                    <div>
+                      <div className="row-title">{r?.name || 'Restaurant'}</div>
+                      {r?.location_address ? <div className="row-meta">{r.location_address}</div> : null}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => handleRemove(rid)}
+                      disabled={!rid || removingId === rid}
+                    >
+                      {removingId === rid ? 'Removing…' : 'Remove'}
+                    </button>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : null}
         </div>

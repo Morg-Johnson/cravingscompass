@@ -89,36 +89,34 @@ function NotificationPreferencesPage() {
                 <div className="row-title">Expiring deals</div>
                 <div className="row-meta">Alert when a deal is close to expiring</div>
               </div>
-              <button
-                type="button"
-                className={`btn${isEnabled('expiring_deals') ? ' btn--primary' : ''}`}
-                onClick={() => toggle('expiring_deals')}
-                disabled={busyType === 'expiring_deals' || status === 'loading'}
-              >
-                {busyType === 'expiring_deals'
-                  ? 'Saving…'
-                  : isEnabled('expiring_deals')
-                    ? 'Enabled'
-                    : 'Disabled'}
-              </button>
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={isEnabled('expiring_deals')}
+                  onChange={() => toggle('expiring_deals')}
+                  disabled={busyType === 'expiring_deals' || status === 'loading'}
+                />
+                <span className="switch__track" aria-hidden="true">
+                  <span className="switch__thumb" aria-hidden="true" />
+                </span>
+              </label>
             </div>
             <div className="list-row">
               <div>
                 <div className="row-title">Expiring points</div>
                 <div className="row-meta">Alert when rewards points are expiring soon</div>
               </div>
-              <button
-                type="button"
-                className={`btn${isEnabled('expiring_points') ? ' btn--primary' : ''}`}
-                onClick={() => toggle('expiring_points')}
-                disabled={busyType === 'expiring_points' || status === 'loading'}
-              >
-                {busyType === 'expiring_points'
-                  ? 'Saving…'
-                  : isEnabled('expiring_points')
-                    ? 'Enabled'
-                    : 'Disabled'}
-              </button>
+              <label className="switch">
+                <input
+                  type="checkbox"
+                  checked={isEnabled('expiring_points')}
+                  onChange={() => toggle('expiring_points')}
+                  disabled={busyType === 'expiring_points' || status === 'loading'}
+                />
+                <span className="switch__track" aria-hidden="true">
+                  <span className="switch__thumb" aria-hidden="true" />
+                </span>
+              </label>
             </div>
           </div>
           {error && status === 'success' ? <p className="muted">{error.message}</p> : null}

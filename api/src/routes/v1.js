@@ -478,6 +478,18 @@ router.get('/users/:userId/favorites', async (req, res, next) => {
   }
 });
 
+router.delete('/users/:userId/favorites/:restaurantId', async (req, res, next) => {
+  try {
+    const { userId, restaurantId } = req.params;
+    const supabase = getSupabaseAdminClient();
+    const del = await supabase.from(TABLES.favorites).delete().eq('user_id', userId).eq('restaurant_id', restaurantId);
+    if (del.error) throw mapSupabaseError(del.error);
+    res.json({ deleted: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 router.delete('/users/:userId/favorites', async (req, res, next) => {
   try {
     const { userId } = req.params;
@@ -562,7 +574,7 @@ router.delete('/users/:userId/notifications', async (req, res, next) => {
 router.post('/users/:userId/rewards', async (req, res, next) => {
   try {
     const { userId } = req.params;
-    const { restaurant_id, points_balance } = req.body || {};
+    const { restaurant_id, points_balance, points_expiration_date } = req.body || {};
     if (!restaurant_id) throw badRequest('restaurant_id is required');
 
     const supabase = getSupabaseAdminClient();
@@ -570,6 +582,7 @@ router.post('/users/:userId/rewards', async (req, res, next) => {
       user_id: userId,
       restaurant_id,
       points_balance: typeof points_balance === 'number' ? points_balance : 0,
+      points_expiration_date: points_expiration_date || null,
     };
 
     const { data, error } = await supabase.from(TABLES.rewards).insert(payload).select('*').single();
@@ -595,9 +608,12 @@ router.get('/users/:userId/rewards', async (req, res, next) => {
 router.put('/users/:userId/rewards/:restaurantId', async (req, res, next) => {
   try {
     const { userId, restaurantId } = req.params;
-    const { points_change } = req.body || {};
+    const { points_change, points_expiration_date } = req.body || {};
     const delta = asNumberOrUndefined(points_change);
-    if (delta === undefined) throw badRequest('points_change is required and must be a number');
+    const hasExpiration = points_expiration_date !== undefined;
+    if (delta === undefined && !hasExpiration) {
+      throw badRequest('points_change must be a number or points_expiration_date must be provided');
+    }
 
     const supabase = getSupabaseAdminClient();
 
@@ -610,11 +626,20 @@ router.put('/users/:userId/rewards/:restaurantId', async (req, res, next) => {
 
     if (readError) throw mapSupabaseError(readError);
 
-    const newBalance = (asNumberOrUndefined(current.points_balance) || 0) + delta;
+    const newBalance = (asNumberOrUndefined(current.points_balance) || 0) + (delta || 0);
+
+    const patch = {
+      points_balance: newBalance,
+      last_updated_at: new Date().toISOString(),
+    };
+
+    if (hasExpiration) {
+      patch.points_expiration_date = points_expiration_date || null;
+    }
 
     const { data, error } = await supabase
       .from(TABLES.rewards)
-      .update({ points_balance: newBalance, last_updated_at: new Date().toISOString() })
+      .update(patch)
       .eq('user_id', userId)
       .eq('restaurant_id', restaurantId)
       .select('*')
@@ -657,9 +682,201 @@ router.get('/rewards/transactions', async (req, res, next) => {
 router.post('/rewards/transactions', async (req, res, next) => {
   try {
     const supabase = getSupabaseAdminClient();
+
     const { data, error } = await supabase.from(TABLES.rewardTransactions).insert(req.body || {}).select('*').single();
     if (error) throw mapSupabaseError(error);
     res.status(201).json(data);
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.post('/dev/seed', async (req, res, next) => {
+  try {
+    if (String(process.env.NODE_ENV || '').toLowerCase() === 'production') {
+      res.status(403).json({ error: { code: 'forbidden', message: 'Seeding is disabled in production' } });
+      return;
+    }
+
+    const supabase = getSupabaseAdminClient();
+
+    const expiration_time = '2030-01-01T00:00:00Z';
+
+    const restaurantSeeds = [
+      { name: 'Chipotle', location_address: '2401 Notre Dame Blvd, Chico, CA 95928' },
+      { name: 'Popeyes', location_address: '2050 Dr Martin Luther King Jr Pkwy, Chico, CA 95928' },
+      { name: 'The Habit Burger Grill', location_address: '1930 E 20th St, Chico, CA 95928' },
+    ];
+
+    const reset = String(req.query.reset || '').toLowerCase() === 'true';
+    if (reset) {
+      const names = restaurantSeeds.map((r) => r.name);
+      const { data: existingRestaurants, error: existingRestaurantsError } = await supabase
+        .from(TABLES.restaurants)
+        .select('restaurant_id,name')
+        .in('name', names);
+      if (existingRestaurantsError) throw mapSupabaseError(existingRestaurantsError);
+
+      const ids = (existingRestaurants || []).map((r) => r.restaurant_id).filter(Boolean);
+
+      let deals_deleted = 0;
+      let restaurants_deleted = 0;
+
+      if (ids.length > 0) {
+        const delDeals = await supabase.from(TABLES.deals).delete().in('restaurant_id', ids);
+        if (delDeals.error) throw mapSupabaseError(delDeals.error);
+        deals_deleted = Array.isArray(delDeals.data) ? delDeals.data.length : 0;
+
+        const delRestaurants = await supabase.from(TABLES.restaurants).delete().in('restaurant_id', ids);
+        if (delRestaurants.error) throw mapSupabaseError(delRestaurants.error);
+        restaurants_deleted = Array.isArray(delRestaurants.data) ? delRestaurants.data.length : 0;
+      }
+
+      // continue to (re)seed after reset
+      // eslint-disable-next-line no-unused-vars
+      const _resetSummary = { deals_deleted, restaurants_deleted };
+    }
+
+    let restaurants_created = 0;
+    let restaurants_updated = 0;
+    const restaurants = [];
+    const restaurantsByName = {};
+
+    for (const seed of restaurantSeeds) {
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await supabase
+        .from(TABLES.restaurants)
+        .select('*')
+        .eq('name', seed.name)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (existing.error) throw mapSupabaseError(existing.error);
+      const existingRow = Array.isArray(existing.data) ? existing.data[0] : null;
+
+      if (existingRow) {
+        // eslint-disable-next-line no-await-in-loop
+        const updated = await supabase
+          .from(TABLES.restaurants)
+          .update({ location_address: seed.location_address })
+          .eq('restaurant_id', existingRow.restaurant_id)
+          .select('*')
+          .single();
+        if (updated.error) throw mapSupabaseError(updated.error);
+        restaurants.push(updated.data);
+        restaurantsByName[updated.data.name] = updated.data;
+        restaurants_updated += 1;
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const created = await supabase.from(TABLES.restaurants).insert(seed).select('*').single();
+      if (created.error) throw mapSupabaseError(created.error);
+      restaurants.push(created.data);
+      restaurantsByName[created.data.name] = created.data;
+      restaurants_created += 1;
+    }
+
+    const chipotleId = restaurantsByName?.Chipotle?.restaurant_id;
+    const popeyesId = restaurantsByName?.Popeyes?.restaurant_id;
+    const habitId = restaurantsByName?.['The Habit Burger Grill']?.restaurant_id;
+
+    const dealsPayload = [
+      // Chipotle
+      { restaurant_id: chipotleId, title: 'Chicken Burrito', price: 9.49, calories: 850, expiration_time, is_expired: false, value_score: 9.2 },
+      { restaurant_id: chipotleId, title: 'Bowl + Chips & Guac', price: 12.99, calories: 1120, expiration_time, is_expired: false, value_score: 6.8 },
+      { restaurant_id: chipotleId, title: 'Tacos (3)', price: 9.99, calories: 780, expiration_time, is_expired: false, value_score: 5.2 },
+
+      // Popeyes
+      { restaurant_id: popeyesId, title: 'Chicken Sandwich Combo', price: 9.49, calories: 1240, expiration_time, is_expired: false, value_score: 8.1 },
+      { restaurant_id: popeyesId, title: '8pc Nuggets + Fries', price: 6.99, calories: 910, expiration_time, is_expired: false, value_score: 6.3 },
+      { restaurant_id: popeyesId, title: '2pc Chicken + Biscuit', price: 5.99, calories: 780, expiration_time, is_expired: false, value_score: 5.6 },
+
+      // The Habit
+      { restaurant_id: habitId, title: 'Charburger w/ Cheese', price: 8.79, calories: 820, expiration_time, is_expired: false, value_score: 7.2 },
+      { restaurant_id: habitId, title: 'Chicken Club Sandwich', price: 9.29, calories: 920, expiration_time, is_expired: false, value_score: 5.8 },
+      { restaurant_id: habitId, title: 'Onion Rings + Drink', price: 4.99, calories: 640, expiration_time, is_expired: false, value_score: 6.1 },
+    ].filter((d) => Boolean(d.restaurant_id));
+
+    let deals_created = 0;
+    let deals_updated = 0;
+    const deals = [];
+
+    for (const seed of dealsPayload) {
+      // eslint-disable-next-line no-await-in-loop
+      const existing = await supabase
+        .from(TABLES.deals)
+        .select('*')
+        .eq('restaurant_id', seed.restaurant_id)
+        .eq('title', seed.title)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (existing.error) throw mapSupabaseError(existing.error);
+      const existingRow = Array.isArray(existing.data) ? existing.data[0] : null;
+
+      if (existingRow) {
+        const dealId = existingRow.deal_id || existingRow.id;
+        if (!dealId) {
+          deals.push(existingRow);
+          continue;
+        }
+
+        // eslint-disable-next-line no-await-in-loop
+        const updated = await supabase
+          .from(TABLES.deals)
+          .update({
+            price: seed.price,
+            calories: seed.calories,
+            expiration_time: seed.expiration_time,
+            is_expired: seed.is_expired,
+            value_score: seed.value_score,
+          })
+          .eq('deal_id', existingRow.deal_id || dealId)
+          .select('*')
+          .maybeSingle();
+
+        if (updated.error) {
+          // Fallback for schemas that use `id` instead of `deal_id`.
+          // eslint-disable-next-line no-await-in-loop
+          const retry = await supabase
+            .from(TABLES.deals)
+            .update({
+              price: seed.price,
+              calories: seed.calories,
+              expiration_time: seed.expiration_time,
+              is_expired: seed.is_expired,
+              value_score: seed.value_score,
+            })
+            .eq('id', dealId)
+            .select('*')
+            .maybeSingle();
+          if (retry.error) throw mapSupabaseError(retry.error);
+          if (retry.data) {
+            deals.push(retry.data);
+            deals_updated += 1;
+          }
+        } else if (updated.data) {
+          deals.push(updated.data);
+          deals_updated += 1;
+        }
+
+        continue;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const created = await supabase.from(TABLES.deals).insert(seed).select('*').single();
+      if (created.error) throw mapSupabaseError(created.error);
+      deals.push(created.data);
+      deals_created += 1;
+    }
+
+    res.status(201).json({
+      restaurants_created,
+      restaurants_updated,
+      deals_created,
+      deals_updated,
+      restaurants,
+      deals,
+    });
   } catch (e) {
     next(e);
   }
