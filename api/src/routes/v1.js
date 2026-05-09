@@ -706,6 +706,7 @@ router.post('/dev/seed', async (req, res, next) => {
       { name: 'Chipotle', location_address: '2401 Notre Dame Blvd, Chico, CA 95928' },
       { name: 'Popeyes', location_address: '2050 Dr Martin Luther King Jr Pkwy, Chico, CA 95928' },
       { name: 'The Habit Burger Grill', location_address: '1930 E 20th St, Chico, CA 95928' },
+      { name: 'West First Deli', location_address: '400 West First Street, Chico, CA 95929' },
     ];
 
     const reset = String(req.query.reset || '').toLowerCase() === 'true';
@@ -779,6 +780,7 @@ router.post('/dev/seed', async (req, res, next) => {
     const chipotleId = restaurantsByName?.Chipotle?.restaurant_id;
     const popeyesId = restaurantsByName?.Popeyes?.restaurant_id;
     const habitId = restaurantsByName?.['The Habit Burger Grill']?.restaurant_id;
+    const westFirstId = restaurantsByName?.['West First Deli']?.restaurant_id;
 
     const dealsPayload = [
       // Chipotle
@@ -795,6 +797,9 @@ router.post('/dev/seed', async (req, res, next) => {
       { restaurant_id: habitId, title: 'Charburger w/ Cheese', price: 8.79, calories: 820, expiration_time, is_expired: false, value_score: 7.2 },
       { restaurant_id: habitId, title: 'Chicken Club Sandwich', price: 9.29, calories: 920, expiration_time, is_expired: false, value_score: 5.8 },
       { restaurant_id: habitId, title: 'Onion Rings + Drink', price: 4.99, calories: 640, expiration_time, is_expired: false, value_score: 6.1 },
+
+      // West First Deli
+      { restaurant_id: westFirstId, title: 'Turkey Sandwich Special', price: 7.99, calories: 690, expiration_time, is_expired: false, value_score: 7.9 },
     ].filter((d) => Boolean(d.restaurant_id));
 
     let deals_created = 0;

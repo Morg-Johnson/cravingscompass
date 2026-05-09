@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getDeals, getRestaurants } from '../lib/api'
+import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
+import markerIcon from 'leaflet/dist/images/marker-icon.png'
+import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 
 function RouteBasedDealsPage() {
   const mapElRef = useRef(null)
@@ -8,6 +11,7 @@ function RouteBasedDealsPage() {
   const layerRef = useRef(null)
   const userInteractedRef = useRef(false)
   const lastBoundsHashRef = useRef('')
+  const markerBoundsRef = useRef([])
 
   const [dataStatus, setDataStatus] = useState('idle')
   const [dataError, setDataError] = useState(null)
@@ -58,7 +62,19 @@ function RouteBasedDealsPage() {
 
       try {
         const L = await import('leaflet')
+        await import('leaflet.markercluster/dist/leaflet.markercluster.js')
         if (cancelled) return
+
+        try {
+          delete L.Icon.Default.prototype._getIconUrl
+          L.Icon.Default.mergeOptions({
+            iconRetinaUrl: markerIcon2x,
+            iconUrl: markerIcon,
+            shadowUrl: markerShadow,
+          })
+        } catch {
+          // ignore
+        }
 
         const map = L.map(mapElRef.current, {
           zoomControl: true,
@@ -69,7 +85,10 @@ function RouteBasedDealsPage() {
           maxZoom: 19,
         }).addTo(map)
 
-        const layer = L.layerGroup().addTo(map)
+        const layer = L.markerClusterGroup({
+          showCoverageOnHover: false,
+          maxClusterRadius: 44,
+        }).addTo(map)
         mapRef.current = map
         layerRef.current = layer
 
@@ -207,6 +226,7 @@ function RouteBasedDealsPage() {
       }
 
       if (bounds.length > 0) {
+        markerBoundsRef.current = bounds
         const hash = bounds
           .map((b) => `${Number(b[0]).toFixed(5)},${Number(b[1]).toFixed(5)}`)
           .sort()
@@ -261,6 +281,21 @@ function RouteBasedDealsPage() {
           {geoStatus === 'error' ? <p className="muted">{geoError?.message || 'Failed to load map'}</p> : null}
 
           <div className="route-map" ref={mapElRef} />
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                const map = mapRef.current
+                const bounds = markerBoundsRef.current
+                if (!map || !bounds || bounds.length === 0) return
+                map.fitBounds(bounds, { padding: [24, 24] })
+              }}
+            >
+              Reset view
+            </button>
+          </div>
         </div>
       </section>
 

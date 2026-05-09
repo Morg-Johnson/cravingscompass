@@ -7,14 +7,24 @@ function SearchResultsPage() {
   const { user, profileStatus } = useAuth() || {}
   const userId = user?.id
 
-  const [query, setQuery] = useState('')
-  const [sort, setSort] = useState('best_value')
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
+  const [draftQuery, setDraftQuery] = useState('')
+  const [draftSort, setDraftSort] = useState('best_value')
+  const [draftFavoritesOnly, setDraftFavoritesOnly] = useState(false)
+
+  const [appliedQuery, setAppliedQuery] = useState('')
+  const [appliedSort, setAppliedSort] = useState('best_value')
+  const [appliedFavoritesOnly, setAppliedFavoritesOnly] = useState(false)
   const [status, setStatus] = useState('idle')
   const [error, setError] = useState(null)
   const [deals, setDeals] = useState([])
   const [restaurantsById, setRestaurantsById] = useState({})
   const [favoriteRestaurantIds, setFavoriteRestaurantIds] = useState([])
+
+  function applySearch() {
+    setAppliedQuery(draftQuery)
+    setAppliedSort(draftSort)
+    setAppliedFavoritesOnly(draftFavoritesOnly)
+  }
 
   useEffect(() => {
     let mounted = true
@@ -23,7 +33,7 @@ function SearchResultsPage() {
       setError(null)
       try {
         const [dealData, restaurantData] = await Promise.all([
-          getDeals({ query: query.trim() || undefined, sort }),
+          getDeals({ query: appliedQuery.trim() || undefined, sort: appliedSort }),
           getRestaurants(),
         ])
         if (!mounted) return
@@ -47,7 +57,7 @@ function SearchResultsPage() {
     return () => {
       mounted = false
     }
-  }, [query, sort])
+  }, [appliedQuery, appliedSort])
 
   useEffect(() => {
     let mounted = true
@@ -90,7 +100,7 @@ function SearchResultsPage() {
   }
 
   const results = useMemo(() => {
-    const q = String(query || '').trim().toLowerCase()
+    const q = String(appliedQuery || '').trim().toLowerCase()
     const tokens = q ? q.split(/\s+/).filter(Boolean) : []
 
     const calorieIntent =
@@ -145,7 +155,7 @@ function SearchResultsPage() {
     const base = deals
       .filter(hasMenuItemTitle)
       .filter((d) => {
-        if (!favoritesOnly) return true
+        if (!appliedFavoritesOnly) return true
         const rid = d?.restaurant_id
         if (!rid) return false
         return favoritesSet.has(String(rid))
@@ -170,7 +180,7 @@ function SearchResultsPage() {
         return a.idx - b.idx
       })
       .map((x) => x.d)
-  }, [deals, favoritesOnly, favoriteRestaurantIds, query, restaurantsById])
+  }, [appliedFavoritesOnly, appliedQuery, deals, favoriteRestaurantIds, restaurantsById])
 
   function getDealId(deal) {
     return deal?.deal_id || deal?.id
@@ -224,16 +234,64 @@ function SearchResultsPage() {
           <div className="form-row">
             <label className="label">
               Keyword
-              <input
+              <div
                 className="input"
-                placeholder="tacos, burger, low cal..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  paddingRight: 10,
+                  gap: 8,
+                }}
+              >
+                <input
+                  placeholder="tacos, burger, low cal..."
+                  value={draftQuery}
+                  onChange={(e) => setDraftQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') applySearch()
+                  }}
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    padding: 0,
+                    margin: 0,
+                    minWidth: 0,
+                  }}
+                />
+                {draftQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setDraftQuery('')}
+                    aria-label="Clear keyword"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      padding: 0,
+                      margin: 0,
+                      lineHeight: 1,
+                      fontSize: 16,
+                      cursor: 'pointer',
+                      opacity: 0.7,
+                      width: 22,
+                      height: 22,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flex: '0 0 auto',
+                    }}
+                  >
+                    x
+                  </button>
+                ) : (
+                  <span style={{ width: 22, height: 22, flex: '0 0 auto' }} aria-hidden="true" />
+                )}
+              </div>
             </label>
             <label className="label">
               Sort
-              <select className="input" value={sort} onChange={(e) => setSort(e.target.value)}>
+              <select className="input" value={draftSort} onChange={(e) => setDraftSort(e.target.value)}>
                 <option value="best_value">Best value</option>
                 <option value="price_asc">Lowest price</option>
               </select>
@@ -241,13 +299,19 @@ function SearchResultsPage() {
               <label className="label" style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
                 <input
                   type="checkbox"
-                  checked={favoritesOnly}
-                  onChange={(e) => setFavoritesOnly(e.target.checked)}
+                  checked={draftFavoritesOnly}
+                  onChange={(e) => setDraftFavoritesOnly(e.target.checked)}
                   disabled={!userId || profileStatus !== 'ready'}
                 />
                 Favorites only
               </label>
             </label>
+
+            <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button type="button" className="btn btn--primary" onClick={applySearch} disabled={status === 'loading'}>
+                Search
+              </button>
+            </div>
           </div>
         </div>
       </section>
